@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { spawn } from "node:child_process"; 
 
 const app = Fastify({
     ajv: {
@@ -18,6 +19,41 @@ function isYouTubeUrl(url: string): boolean {
     )
 }
 
+type VideoInfo = {
+    title: string;
+    duration: number;
+    thumbnail: string;
+}
+
+function getVideoInfo(url: string): Promise<VideoInfo> {
+    return new Promise((resolve, reject) => {
+    
+        const ytDlpProcess = spawn("yt-dlp", ["--dump-single-json",
+            url
+        ]);
+
+        let output = "";
+        let errorOutput = "";
+
+        ytDlpProcess.stdout.on("data", (data) => {
+            output += data.toString();
+        })
+
+        ytDlpProcess.stderr.on("data", (data) => {
+            errorOutput += data.toString();
+        })
+
+        ytDlpProcess.on("close", (code) => {
+            if (code === 0) {
+                resolve(JSON.parse(output) as VideoInfo);
+            } else {
+                reject(new Error(errorOutput));
+            }
+        })
+
+    })
+};
+
 type VideoBodyRequest = {
     url: string;
 };
@@ -27,6 +63,7 @@ app.get("/api/health", async () => {
     status: "ok"
   };
 });
+
 
 app.post<{ Body: VideoBodyRequest }>("/api/video/info", {
     schema: {
@@ -50,13 +87,27 @@ app.post<{ Body: VideoBodyRequest }>("/api/video/info", {
     });
   }
 
-  console.log(isYoutube);
+  try {
+    const videoData = await getVideoInfo(request.body.url);
 
-  return {
-    message: "Recebi os dados!",
-    data: request.body.url,
-    isYoutube
-  };
+    console.log(videoData.title);
+    console.log(videoData.duration);
+    console.log(videoData.thumbnail);
+    console.log(isYoutube);
+
+    return {
+        message: "Informações encontradas!",
+        data: videoData,
+        isYoutube
+    };
+  } catch (error) {
+    console.error(error);
+
+    return reply.status(502).send({
+        error: "Não foi possível obter as informações do vídeo. Verifique se a URL é válida e tente novamente."
+    });
+  }
+
 });
 
 app.listen({ port: 3000 }, () => {
