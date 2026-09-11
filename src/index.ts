@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import { spawn } from "node:child_process"; 
+import cors from "@fastify/cors";
 
 const app = Fastify({
     ajv: {
@@ -8,6 +9,10 @@ const app = Fastify({
         }
     }
 });
+
+await app.register(cors, {
+    origin: "http://localhost:5173",
+})
 
 function isYouTubeUrl(url: string): boolean {
     const parsedUrl = new URL(url);
@@ -45,7 +50,12 @@ function getVideoInfo(url: string): Promise<VideoInfo> {
 
         ytDlpProcess.on("close", (code) => {
             if (code === 0) {
-                resolve(JSON.parse(output) as VideoInfo);
+                const video = JSON.parse(output);
+                resolve({
+                    title: video.title,
+                    duration: video.duration,
+                    thumbnail: video.thumbnail
+                });
             } else {
                 reject(new Error(errorOutput));
             }
