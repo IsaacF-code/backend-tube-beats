@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 import { spawn } from "node:child_process"; 
 import cors from "@fastify/cors";
+import path from "node:path";
+import fs from "node:fs";
 
 const app = Fastify({
     ajv: {
@@ -119,6 +121,51 @@ app.post<{ Body: VideoBodyRequest }>("/api/video/info", {
   }
 
 });
+
+async function downloadAudio(url: string): Promise<string> {
+    const downloadsDir = path.resolve("downloads"); 
+    fs.mkdirSync(downloadsDir, {recursive: true});
+
+    const outputPath = path.join(downloadsDir, "%(title)s.%(ext)s");
+
+    const ytDlpProcess = spawn("yt-dlp", [
+        "-x",
+        "--audio-format", "mp3",
+        "-o", outputPath,
+        "--print", "after_move:filepath",
+        url
+    ]);
+
+    let output = "";
+
+    ytDlpProcess.stdout.on("data", (data) => {
+        output += data.toString();
+    })
+
+    return new Promise((resolve, reject) => {
+        ytDlpProcess.on("close", (code) => {
+            if (code === 0) {
+                resolve(output.trim());
+            } else {
+                reject(new Error("Não foi possível baixar o áudio."));
+            }
+        });
+    });
+}
+
+app.post<{ Body: VideoBodyRequest }>("/api/video/download", async (request, reply) => {
+    
+    const filePath = await downloadAudio(request.body.url);
+    const fileStream = fs.createReadStream(filePath);
+
+    console.log("Arquivo: ", filePath);
+    console.log("Stream criado: ", fileStream);
+
+    return {
+        message: "Download concluído!",
+        filePath
+    };
+})
 
 app.listen({ port: 3000 }, () => {
   console.log("Servidor rodando em http://localhost:3000");
