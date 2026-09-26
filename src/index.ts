@@ -134,7 +134,13 @@ async function downloadAudio(url: string): Promise<string> {
         "-o", outputPath,
         "--print", "after_move:filepath",
         url
-    ]);
+    ], {
+        env: {
+            ...process.env,
+            PYTHONIOENCODING: "utf-8"
+        }
+    },
+    );
 
     let output = "";
 
@@ -145,7 +151,8 @@ async function downloadAudio(url: string): Promise<string> {
     return new Promise((resolve, reject) => {
         ytDlpProcess.on("close", (code) => {
             if (code === 0) {
-                resolve(output.trim());
+                const filePath = output.trim();
+                resolve(filePath);
             } else {
                 reject(new Error("Não foi possível baixar o áudio."));
             }
@@ -156,16 +163,24 @@ async function downloadAudio(url: string): Promise<string> {
 app.post<{ Body: VideoBodyRequest }>("/api/video/download", async (request, reply) => {
     
     const filePath = await downloadAudio(request.body.url);
+    const fileName = path.basename(filePath)
+
     const fileStream = fs.createReadStream(filePath);
 
-    console.log("Arquivo: ", filePath);
-    console.log("Stream criado: ", fileStream);
+    // console.log("Arquivo: ", filePath);
+    // console.log("Stream criado: ", fileStream);
 
-    return {
-        message: "Download concluído!",
-        filePath
-    };
+    return reply
+    .type("audio/mpeg")
+    .header("Content-Disposition", createContentDisposition(fileName))
+    .send(fileStream);
 })
+
+function createContentDisposition(fileName: string): string {
+    const encodedFileName = encodeURIComponent(fileName);
+
+    return `attachment; filename*=UTF-8''${encodedFileName}`;
+}
 
 app.listen({ port: 3000 }, () => {
   console.log("Servidor rodando em http://localhost:3000");
