@@ -14,6 +14,7 @@ const app = Fastify({
 
 await app.register(cors, {
     origin: "http://localhost:5173",
+    exposedHeaders: ["Content-Disposition"]
 })
 
 function isYouTubeUrl(url: string): boolean {
