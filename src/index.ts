@@ -164,26 +164,40 @@ async function downloadAudio(url: string): Promise<string> {
 
 app.post<{ Body: VideoBodyRequest }>("/api/video/download", async (request, reply) => {
     
-    const filePath = await downloadAudio(request.body.url);
-    const fileName = path.basename(filePath)
+    const isYoutube = isYouTubeUrl(request.body.url);
 
-    const fileStream = fs.createReadStream(filePath);
+    if (!isYoutube) {
+        return reply.status(400).send({
+            error: "A URL fornecida precisa ser do YouTube."
+        });
+    }
 
-    fileStream.on("close", () => {
-        fs.unlink(filePath, (error) => {
-            if (error) {
-                console.error("Erro ao excluir arquivo temporário: ", error);
-            }
+    try {
+
+        const filePath = await downloadAudio(request.body.url);
+        const fileName = path.basename(filePath)
+
+        const fileStream = fs.createReadStream(filePath);
+
+        fileStream.on("close", () => {
+            fs.unlink(filePath, (error) => {
+                if (error) {
+                    console.error("Erro ao excluir arquivo temporário: ", error);
+                }
+            })
         })
-    })
 
-    // console.log("Arquivo: ", filePath);
-    // console.log("Stream criado: ", fileStream);
-
-    return reply
-    .type("audio/mpeg")
-    .header("Content-Disposition", createContentDisposition(fileName))
-    .send(fileStream);
+        return reply
+        .type("audio/mpeg")
+        .header("Content-Disposition", createContentDisposition(fileName))
+        .send(fileStream);
+    
+    } catch (error) {
+        console.error(error);
+        return reply.status(502).send({
+            error: "Não foi possível baixar o áudio. Verifique se a URL é válida e tente novamente."
+        });
+    }
 })
 
 function createContentDisposition(fileName: string): string {
