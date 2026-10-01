@@ -131,7 +131,8 @@ async function downloadAudio(url: string): Promise<string> {
 
     const ytDlpProcess = spawn("yt-dlp", [
         "-x",
-        "--audio-format", "mp3",
+        "--audio-format", "mp3", 
+        "--embed-metadata", "--embed-thumbnail",
         "-o", outputPath,
         "--print", "after_move:filepath",
         url
@@ -167,6 +168,14 @@ app.post<{ Body: VideoBodyRequest }>("/api/video/download", async (request, repl
     const fileName = path.basename(filePath)
 
     const fileStream = fs.createReadStream(filePath);
+
+    fileStream.on("close", () => {
+        fs.unlink(filePath, (error) => {
+            if (error) {
+                console.error("Erro ao excluir arquivo temporário: ", error);
+            }
+        })
+    })
 
     // console.log("Arquivo: ", filePath);
     // console.log("Stream criado: ", fileStream);
