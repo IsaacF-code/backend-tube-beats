@@ -18,13 +18,17 @@ await app.register(cors, {
 })
 
 function isYouTubeUrl(url: string): boolean {
-    const parsedUrl = new URL(url);
-    
-    return (
-        parsedUrl.hostname === "youtube.com" ||
-        parsedUrl.hostname === "www.youtube.com" ||
-        parsedUrl.hostname === "youtu.be"
-    )
+    try {
+        const parsedUrl = new URL(url);
+        
+        return (
+            parsedUrl.hostname === "youtube.com" ||
+            parsedUrl.hostname === "www.youtube.com" ||
+            parsedUrl.hostname === "youtu.be"
+        )
+    } catch {
+        return false;
+    }
 }
 
 type VideoInfo = {
@@ -53,12 +57,16 @@ function getVideoInfo(url: string): Promise<VideoInfo> {
 
         ytDlpProcess.on("close", (code) => {
             if (code === 0) {
+                try {
                 const video = JSON.parse(output);
                 resolve({
                     title: video.title,
                     duration: video.duration,
                     thumbnail: video.thumbnail
                 });
+                } catch {
+                    reject(new Error("Não foi possível analisar as informações do vídeo."));
+                }
             } else {
                 reject(new Error(errorOutput));
             }
@@ -102,11 +110,6 @@ app.post<{ Body: VideoBodyRequest }>("/api/video/info", {
 
   try {
     const videoData = await getVideoInfo(request.body.url);
-
-    console.log(videoData.title);
-    console.log(videoData.duration);
-    console.log(videoData.thumbnail);
-    console.log(isYoutube);
 
     return {
         message: "Informações encontradas!",
