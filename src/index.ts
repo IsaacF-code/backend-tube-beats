@@ -42,7 +42,9 @@ type VideoInfo = {
 function getVideoInfo(url: string): Promise<VideoInfo> {
     return new Promise((resolve, reject) => {
     
-        const ytDlpProcess = spawn("yt-dlp", ["--dump-single-json",
+        const ytDlpProcess = spawn("yt-dlp", [
+            "--js-runtimes", "--node",
+            "--dump-single-json",
             url
         ]);
 
@@ -135,6 +137,7 @@ async function downloadAudio(url: string): Promise<string> {
     const outputPath = path.join(downloadsDir, "%(title)s.%(ext)s");
 
     const ytDlpProcess = spawn("yt-dlp", [
+        "--js-runtimes", "--node",
         "-x",
         "--audio-format", "mp3", 
         "--embed-metadata", "--embed-thumbnail",
