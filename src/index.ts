@@ -12,8 +12,10 @@ const app = Fastify({
     }
 });
 
+const frontUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
 await app.register(cors, {
-    origin: "http://localhost:5173",
+    origin: frontUrl,
     exposedHeaders: ["Content-Disposition"]
 })
 
@@ -209,6 +211,11 @@ function createContentDisposition(fileName: string): string {
     return `attachment; filename*=UTF-8''${encodedFileName}`;
 }
 
-app.listen({ port: 3000 }, () => {
-  console.log("Servidor rodando em http://localhost:3000");
+const port = Number(process.env.PORT) || 3000;
+
+app.listen({ 
+    port,
+    host: "0.0.0.0"
+}, () => {
+  console.log(`Servidor rodando na porta ${port}`);
 });
