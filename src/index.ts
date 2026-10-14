@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import cors from "@fastify/cors";
 import path from "node:path";
 import fs from "node:fs";
+import os from "node:os";
 
 const app = Fastify({
     ajv: {
@@ -39,11 +40,45 @@ type VideoInfo = {
     thumbnail: string;
 }
 
+function prepareCookiesFile(): string | null {
+    const sourcePath = process.env.YTDLP_COOKIES_PATH;
+
+    if (!sourcePath) {
+        return null;
+    }
+
+    if (!fs.existsSync(sourcePath)) {
+        console.warn(`Arquivo de cookies não encontrado em: ${sourcePath}`);
+        return null;
+    }
+
+    const writablePath = path.join(os.tmpdir(), "yt-dlp-cookies.txt");
+    fs.copyFileSync(sourcePath, writablePath);
+
+    return writablePath;
+}
+
+const cookiesPath = prepareCookiesFile();
+
+function getBaseYtDlpArgs(): string[] {
+    const args = ["--js-runtimes", `node:${process.execPath}`];
+
+    if (cookiesPath) {
+        args.push("--cookies", cookiesPath);
+    }
+
+    if (process.env.YTDLP_PROXY) {
+        args.push("--proxy", process.env.YTDLP_PROXY);
+    }
+
+    return args;
+}
+
 function getVideoInfo(url: string): Promise<VideoInfo> {
     return new Promise((resolve, reject) => {
     
         const ytDlpProcess = spawn("yt-dlp", [
-            "--js-runtimes", `node:${process.execPath}`,
+            ...getBaseYtDlpArgs(),
             "--dump-single-json",
             url
         ]);
@@ -137,7 +172,7 @@ async function downloadAudio(url: string): Promise<string> {
     const outputPath = path.join(downloadsDir, "%(title)s.%(ext)s");
 
     const ytDlpProcess = spawn("yt-dlp", [
-        "--js-runtimes", `node:${process.execPath}`,
+        ...getBaseYtDlpArgs(),
         "-x",
         "--audio-format", "mp3", 
         "--embed-metadata", "--embed-thumbnail",
@@ -153,9 +188,14 @@ async function downloadAudio(url: string): Promise<string> {
     );
 
     let output = "";
+    let errorOutput = "";
 
     ytDlpProcess.stdout.on("data", (data) => {
         output += data.toString();
+    })
+
+    ytDlpProcess.stderr.on("data", (data) => {
+        errorOutput += data.toString();
     })
 
     return new Promise((resolve, reject) => {
@@ -164,7 +204,7 @@ async function downloadAudio(url: string): Promise<string> {
                 const filePath = output.trim();
                 resolve(filePath);
             } else {
-                reject(new Error("Não foi possível baixar o áudio."));
+                reject(new Error(`Não foi possível baixar o áudio.\n${errorOutput}`));
             }
         });
     });
